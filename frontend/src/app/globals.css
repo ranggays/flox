@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+/* @tailwind base; */
+/* @tailwind components; */
+@custom-variant dark (&:where(.dark, .dark *));
+@tailwind utilities;
+
+body {
+  font-family: "Inter", sans-serif;
+}
