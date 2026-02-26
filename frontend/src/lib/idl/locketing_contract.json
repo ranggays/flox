@@ -1,0 +1,909 @@
+{
+  "address": "647HoEVTSQenPoE1XxuyCNL9JGks1h3Y66WkVWBJm1GM",
+  "metadata": {
+    "name": "locketing_contract",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "add_ticket_tier",
+      "discriminator": [
+        234,
+        175,
+        97,
+        187,
+        141,
+        39,
+        150,
+        213
+      ],
+      "accounts": [
+        {
+          "name": "event_account",
+          "writable": true
+        },
+        {
+          "name": "tier_account",
+          "writable": true
+        },
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "event_account"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "tier_index",
+          "type": "u8"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "price",
+          "type": "u64"
+        },
+        {
+          "name": "max_supply",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "add_validator",
+      "discriminator": [
+        250,
+        113,
+        53,
+        54,
+        141,
+        117,
+        215,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "event_account"
+        },
+        {
+          "name": "validator_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event_account"
+              },
+              {
+                "kind": "arg",
+                "path": "validator_pubkey"
+              }
+            ]
+          }
+        },
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "event_account"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_pubkey",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "cancel_event",
+      "discriminator": [
+        55,
+        143,
+        36,
+        45,
+        59,
+        241,
+        89,
+        119
+      ],
+      "accounts": [
+        {
+          "name": "event_account",
+          "writable": true
+        },
+        {
+          "name": "escrow_account",
+          "writable": true
+        },
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "event_account",
+            "escrow_account"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_refund",
+      "discriminator": [
+        15,
+        16,
+        30,
+        161,
+        255,
+        228,
+        97,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "event_account"
+        },
+        {
+          "name": "tier_account"
+        },
+        {
+          "name": "escrow_account",
+          "writable": true
+        },
+        {
+          "name": "ticket_account",
+          "writable": true
+        },
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_event",
+      "discriminator": [
+        49,
+        219,
+        29,
+        203,
+        22,
+        98,
+        100,
+        87
+      ],
+      "accounts": [
+        {
+          "name": "event_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "organizer"
+              },
+              {
+                "kind": "arg",
+                "path": "event_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_account",
+          "writable": true
+        },
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "escrow_account"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "event_id",
+          "type": "u64"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "category",
+          "type": {
+            "defined": {
+              "name": "Category"
+            }
+          }
+        },
+        {
+          "name": "event_type",
+          "type": {
+            "defined": {
+              "name": "EventType"
+            }
+          }
+        },
+        {
+          "name": "location",
+          "type": "string"
+        },
+        {
+          "name": "start_time",
+          "type": "i64"
+        },
+        {
+          "name": "end_time",
+          "type": "i64"
+        },
+        {
+          "name": "image_uri",
+          "type": "string"
+        },
+        {
+          "name": "metadata_uri",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "initialize_escrow",
+      "discriminator": [
+        243,
+        160,
+        77,
+        153,
+        11,
+        92,
+        48,
+        209
+      ],
+      "accounts": [
+        {
+          "name": "escrow_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "organizer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "mint_ticket",
+      "discriminator": [
+        159,
+        167,
+        223,
+        60,
+        138,
+        6,
+        23,
+        29
+      ],
+      "accounts": [
+        {
+          "name": "event_account",
+          "writable": true
+        },
+        {
+          "name": "tier_account",
+          "writable": true
+        },
+        {
+          "name": "escrow_account",
+          "writable": true
+        },
+        {
+          "name": "ticket_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  99,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event_account"
+              },
+              {
+                "kind": "arg",
+                "path": "token_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "token_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "stake_for_event",
+      "discriminator": [
+        217,
+        71,
+        207,
+        21,
+        123,
+        172,
+        13,
+        85
+      ],
+      "accounts": [
+        {
+          "name": "escrow_account",
+          "writable": true
+        },
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "escrow_account"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "validate_ticket",
+      "discriminator": [
+        222,
+        125,
+        246,
+        215,
+        10,
+        163,
+        159,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "validator_account"
+        },
+        {
+          "name": "ticket_account",
+          "writable": true
+        },
+        {
+          "name": "validator",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "validator_account"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "withdraw_funds",
+      "discriminator": [
+        241,
+        36,
+        29,
+        111,
+        208,
+        31,
+        104,
+        217
+      ],
+      "accounts": [
+        {
+          "name": "event_account",
+          "writable": true
+        },
+        {
+          "name": "escrow_account",
+          "writable": true
+        },
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "event_account",
+            "escrow_account"
+          ]
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "EscrowAccount",
+      "discriminator": [
+        36,
+        69,
+        48,
+        18,
+        128,
+        225,
+        125,
+        135
+      ]
+    },
+    {
+      "name": "EventAccount",
+      "discriminator": [
+        98,
+        136,
+        32,
+        165,
+        133,
+        231,
+        243,
+        154
+      ]
+    },
+    {
+      "name": "TicketNFTAccount",
+      "discriminator": [
+        221,
+        117,
+        153,
+        218,
+        197,
+        159,
+        90,
+        122
+      ]
+    },
+    {
+      "name": "TicketTierAccount",
+      "discriminator": [
+        17,
+        122,
+        53,
+        99,
+        10,
+        251,
+        81,
+        76
+      ]
+    },
+    {
+      "name": "ValidatorAccount",
+      "discriminator": [
+        32,
+        144,
+        229,
+        203,
+        9,
+        154,
+        158,
+        255
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "NotStaked",
+      "msg": "Organizer harus mengunci Stake 0.05 SOL terlebih dahulu!"
+    },
+    {
+      "code": 6001,
+      "name": "EventNotActive",
+      "msg": "Event sudah tidak aktif atau dibatalkan."
+    },
+    {
+      "code": 6002,
+      "name": "SoldOut",
+      "msg": "Maaf, tiket untuk tier ini sudah habis (Sold Out)!"
+    },
+    {
+      "code": 6003,
+      "name": "ValidatorNotActive",
+      "msg": "Satpam ini tidak aktif atau tidak berwenang!"
+    },
+    {
+      "code": 6004,
+      "name": "TicketAlreadyUsed",
+      "msg": "Tiket ini sudah di-scan sebelumnya (Hangus)!"
+    },
+    {
+      "code": 6005,
+      "name": "EventNotEnded",
+      "msg": "Acara belum selesai! Dana masih dikunci."
+    },
+    {
+      "code": 6006,
+      "name": "InsufficientEscrow",
+      "msg": "Saldo di Escrow tidak mencukupi untuk penarikan ini."
+    },
+    {
+      "code": 6007,
+      "name": "EventNotCancelled",
+      "msg": "Hanya bisa refund untuk event yang dibatalkan"
+    }
+  ],
+  "types": [
+    {
+      "name": "Category",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Music"
+          },
+          {
+            "name": "Conference"
+          },
+          {
+            "name": "Sports"
+          },
+          {
+            "name": "Art"
+          },
+          {
+            "name": "Hackathon"
+          },
+          {
+            "name": "Workshop"
+          },
+          {
+            "name": "Other"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EscrowAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "organizer",
+            "type": "pubkey"
+          },
+          {
+            "name": "locked_amount",
+            "type": "u64"
+          },
+          {
+            "name": "available_amount",
+            "type": "u64"
+          },
+          {
+            "name": "event_count",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EventAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "organizer",
+            "type": "pubkey"
+          },
+          {
+            "name": "event_id",
+            "type": "u64"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "category",
+            "type": {
+              "defined": {
+                "name": "Category"
+              }
+            }
+          },
+          {
+            "name": "event_type",
+            "type": {
+              "defined": {
+                "name": "EventType"
+              }
+            }
+          },
+          {
+            "name": "location",
+            "type": "string"
+          },
+          {
+            "name": "start_time",
+            "type": "i64"
+          },
+          {
+            "name": "end_time",
+            "type": "i64"
+          },
+          {
+            "name": "image_uri",
+            "type": "string"
+          },
+          {
+            "name": "metadata_uri",
+            "type": "string"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "EventStatus"
+              }
+            }
+          },
+          {
+            "name": "total_revenue",
+            "type": "u64"
+          },
+          {
+            "name": "tickets_sold",
+            "type": "u32"
+          },
+          {
+            "name": "tier_count",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EventStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Cancelled"
+          },
+          {
+            "name": "Ended"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EventType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Physical"
+          },
+          {
+            "name": "Virtual"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TicketNFTAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "tier",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_id",
+            "type": "u64"
+          },
+          {
+            "name": "is_used",
+            "type": "bool"
+          },
+          {
+            "name": "purchased_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TicketTierAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "tier_index",
+            "type": "u8"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "max_supply",
+            "type": "u32"
+          },
+          {
+            "name": "sold",
+            "type": "u32"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "added_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}
