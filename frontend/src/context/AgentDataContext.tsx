@@ -38,7 +38,7 @@ export interface AgentUserTicket {
   id:       string;
   title:    string;
   date:     string;
-  status:   "upcoming" | "attended" | "listed";
+  status:   "upcoming" | "attended" | "listed" | "cancelled";
   category: string;
 }
 

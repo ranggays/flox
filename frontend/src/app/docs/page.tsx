@@ -5,8 +5,6 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
-// https://drive.google.com/file/d/1GCy8B_G6zM6Su-bu8C-2vauHr1Ko5pN3/view?usp=sharing
-const YOUTUBE_VIDEO_ID = "YOUR_VIDEO_ID";
 // Ganti konstanta di bagian atas file
 const GDRIVE_FILE_ID = "1GCy8B_G6zM6Su-bu8C-2vauHr1Ko5pN3";
 
@@ -123,7 +121,6 @@ const HOW_IT_WORKS = [
 
 export default function DocsPage() {
   const [activeSection, setActiveSection] = useState("demo");
-  const [videoLoaded, setVideoLoaded] = useState(false);
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -210,7 +207,7 @@ export default function DocsPage() {
                     <div className="flex items-center gap-2 px-4 py-2 bg-slate-800 rounded-xl border border-slate-700">
                       <span className="material-symbols-outlined text-slate-400 text-sm">info</span>
                       <p className="text-slate-400 text-xs font-mono">
-                        const YOUTUBE_VIDEO_ID = "YOUR_VIDEO_ID"
+                        const YOUTUBE_VIDEO_ID = &quot;YOUR_VIDEO_ID&quot;
                       </p>
                     </div>
                   </div>
@@ -221,7 +218,6 @@ export default function DocsPage() {
                     className="absolute inset-0 w-full h-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
-                    onLoad={() => setVideoLoaded(true)}
                   />
                 )}
               </div>
@@ -408,7 +404,7 @@ export default function DocsPage() {
               </div>
 
               <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
-                The floating button on every page opens an AI assistant that reads live on-chain data — with zero extra RPC calls. Data is pushed to the AI from whatever page you've already visited, so the AI knows about events, your tickets, and organizer revenue without making duplicate blockchain requests.
+                AI Home is the main assistant surface for Flox. It reads the same live on-chain product context used across discovery, tickets, and organizer workflows, so it can guide users without duplicating the core browsing and workspace pages.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -422,7 +418,7 @@ export default function DocsPage() {
                 ].map((item) => (
                   <div key={item.q} className="flex items-center gap-3 px-4 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
                     <span className="material-symbols-outlined text-[#5048e5] text-lg shrink-0">{item.icon}</span>
-                    <p className="text-sm text-slate-700 dark:text-slate-300 italic">"{item.q}"</p>
+                    <p className="text-sm text-slate-700 dark:text-slate-300 italic">&ldquo;{item.q}&rdquo;</p>
                   </div>
                 ))}
               </div>

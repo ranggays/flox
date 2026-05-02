@@ -1,39 +1,37 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useAgentData } from "@/context/AgentDataContext";
+import {
+  ASSISTANT_CATEGORIES,
+  ASSISTANT_SUGGESTIONS,
+  ASSISTANT_WELCOME_MESSAGE,
+  extractAssistantActionLinks,
+  extractAssistantActionLinksFromResult,
+  extractAssistantStructuredResult,
+  stripAssistantStructuredResult,
+  type AssistantChatContext,
+  type AssistantPreferences,
+} from "@/lib/assistant";
 
-interface Preferences {
-  categories: string[];
-  eventType:  "all" | "physical" | "virtual";
-  language:   "en" | "id";
+interface AssistantMessage {
+  content?: string;
+  parts?: Array<{
+    type: string;
+    text?: string;
+  }>;
 }
-
-const CATEGORIES  = ["Music", "Technology", "Sports", "Art", "Hackathon", "Workshop", "Conference"];
-const SUGGESTIONS = [
-  "What events are available?",
-  "How do I buy a ticket?",
-  "What is the escrow system?",
-  "Show my ticket status",
-];
-
-const WELCOME_MESSAGE = {
-  id:    "welcome",
-  role:  "assistant" as const,
-  parts: [{
-    type: "text" as const,
-    text: "Hey! I'm your Flox AI assistant. I can tell you about events, ticket availability, revenue stats, and how the platform works. What's on your mind?",
-  }],
-};
 
 export default function FloatingAgent() {
   const [isOpen,     setIsOpen]     = useState(false);
   const [activeTab,  setActiveTab]  = useState<"chat" | "preferences">("chat");
   const [localInput, setLocalInput] = useState("");
-  const [prefs,      setPrefs]      = useState<Preferences>({
+  const [prefs,      setPrefs]      = useState<AssistantPreferences>({
     categories: [],
     eventType:  "all",
     language:   "en",
@@ -46,86 +44,15 @@ export default function FloatingAgent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { publicKey }                    = useWallet();
+  const pathname = usePathname();
   const { events, organizerData, userTickets } = useAgentData();
-
-  const buildSystemPrompt = useCallback(() => {
-    const eventSummary = events.length > 0
-      ? events.map((ev) => {
-          const tierLines = ev.tiers.length > 0
-            ? ev.tiers.map(t =>
-                `    • ${t.name}: ${t.priceSol} SOL — ${t.available}/${t.maxSupply} available`
-              ).join("\n")
-            : "    • No tiers configured";
-
-          return [
-            `[ID:${ev.id}] "${ev.name}"`,
-            `  ${ev.category} | ${ev.type} | ${ev.status}`,
-            `  Location : ${ev.location}`,
-            `  Date     : ${new Date(ev.startTime * 1000).toLocaleDateString()} – ${new Date(ev.endTime * 1000).toLocaleDateString()}`,
-            `  Sold     : ${ev.sold} tickets | Revenue: ${ev.revenue} SOL | Available: ${ev.available}`,
-            `  URL      : /events/${ev.id}`,
-            `  Tiers    :\n${tierLines}`,
-          ].join("\n");
-        }).join("\n\n")
-      : "No events loaded yet.";
-
-    const organizerSection = organizerData
-      ? [
-          "ORGANIZER STATS (current wallet):",
-          `  Escrow locked    : ${organizerData.escrowLocked.toFixed(3)} SOL`,
-          `  Escrow available : ${organizerData.escrowAvailable.toFixed(3)} SOL`,
-          `  Total revenue    : ${organizerData.totalRevenue} SOL`,
-          `  Total sold       : ${organizerData.totalSold} tickets`,
-          `  Active events    : ${organizerData.eventCount}`,
-        ].join("\n")
-      : "";
-
-    const ticketSection = userTickets.length > 0
-      ? [
-          `USER TICKETS (${userTickets.length} total):`,
-          ...userTickets.map(t =>
-            `  - "${t.title}" | ${t.date} | Status: ${t.status} | Category: ${t.category}`
-          ),
-        ].join("\n")
-      : "";
-
-    const walletInfo = publicKey
-      ? `Wallet: ${publicKey.toBase58().slice(0, 8)}... (connected)`
-      : "Wallet: not connected";
-
-    const prefContext = prefs.categories.length > 0
-      ? `User prefers: ${prefs.categories.join(", ")} | Format: ${prefs.eventType}`
-      : "";
-
-    return `You are a helpful assistant for Flox, a Solana-based event ticketing platform.
-
-PLATFORM:
-- Network: Solana Devnet
-- Tickets are on-chain PDAs (not NFTs)
-- Organizers stake 0.05 SOL (refundable) to create events
-- Revenue held in escrow, released to organizer after event ends
-- Validators scan QR codes to mark tickets as used
-
-${walletInfo}
-${prefContext ? prefContext + "\n" : ""}
-LIVE ON-CHAIN EVENTS (${events.length} total):
-${eventSummary}
-${organizerSection ? "\n" + organizerSection : ""}${ticketSection ? "\n\n" + ticketSection : ""}
-
-RULES:
-- Be concise, max 150 words unless detail needed
-- Always link events as /events/[id] with tier prices
-- Cannot execute transactions — direct user to event page
-- For organizer/escrow data: only answer if wallet connected and data available
-- ${prefs.language === "id" ? "Respond in Bahasa Indonesia." : "Respond in English."}`;
-  }, [events, organizerData, userTickets, publicKey, prefs]);
 
   const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
   });
 
   const isLoading  = status === "streaming" || status === "submitted";
-  const allMessages = [WELCOME_MESSAGE, ...messages];
+  const allMessages = [ASSISTANT_WELCOME_MESSAGE, ...messages];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -185,13 +112,28 @@ RULES:
   const handleSend = (text?: string) => {
     const content = text ?? localInput.trim();
     if (!content || isLoading) return;
-    sendMessage({ text: content }, { body: { system: buildSystemPrompt() } });
+
+    const context: AssistantChatContext = {
+      route: pathname,
+      surface: "floating-agent",
+      walletPublicKey: publicKey?.toBase58() ?? null,
+      prefs,
+    };
+
+    sendMessage(
+      { text: content },
+      {
+        body: {
+          context,
+        },
+      }
+    );
     setLocalInput("");
   };
 
-  const getMessageText = (msg: any): string =>
+  const getMessageText = (msg: AssistantMessage): string =>
     msg.parts
-      ? msg.parts.filter((p: any) => p.type === "text").map((p: any) => p.text).join("")
+      ? msg.parts.filter((p) => p.type === "text").map((p) => p.text ?? "").join("")
       : msg.content ?? "";
 
   return (
@@ -251,15 +193,53 @@ RULES:
                         <span className="material-symbols-outlined text-white text-sm">auto_awesome</span>
                       </div>
                     )}
-                    <div className={`max-w-[80%] ${msg.role === "user" ? "items-end" : "items-start"} flex flex-col`}>
-                      <div className={`px-3 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                        msg.role === "user"
-                          ? "bg-[#5048e5] text-white rounded-tr-sm"
-                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-700 rounded-tl-sm"
-                      }`}>
-                        {getMessageText(msg)}
-                      </div>
-                    </div>
+                    {(() => {
+                      const rawText = getMessageText(msg);
+                      const structuredResult =
+                        msg.role === "assistant"
+                          ? extractAssistantStructuredResult(rawText)
+                          : null;
+                      const visibleText =
+                        msg.role === "assistant"
+                          ? stripAssistantStructuredResult(rawText)
+                          : rawText;
+                      const actionLinks =
+                        msg.role === "assistant"
+                          ? [
+                              ...extractAssistantActionLinksFromResult(structuredResult),
+                              ...extractAssistantActionLinks(visibleText),
+                            ].filter(
+                              (action, index, arr) =>
+                                arr.findIndex((candidate) => candidate.href === action.href) === index
+                            )
+                          : [];
+
+                      return (
+                        <div className={`max-w-[80%] ${msg.role === "user" ? "items-end" : "items-start"} flex flex-col gap-2`}>
+                          <div className={`px-3 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${
+                            msg.role === "user"
+                              ? "bg-[#5048e5] text-white rounded-tr-sm"
+                              : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-700 rounded-tl-sm"
+                          }`}>
+                            {visibleText}
+                          </div>
+                          {msg.role === "assistant" && actionLinks.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {actionLinks.map((action) => (
+                                <Link
+                                  key={`${msg.id}-${action.href}`}
+                                  href={action.href}
+                                  className="inline-flex items-center gap-1 rounded-full border border-[#5048e5]/30 bg-[#5048e5]/5 px-2.5 py-1 text-[11px] font-semibold text-[#5048e5] transition-colors hover:bg-[#5048e5]/10"
+                                >
+                                  <span className="material-symbols-outlined text-xs">arrow_outward</span>
+                                  {action.label}
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
 
@@ -279,7 +259,7 @@ RULES:
 
                 {allMessages.length === 1 && !isLoading && (
                   <div className="flex flex-wrap gap-2 pt-1">
-                    {SUGGESTIONS.map(s => (
+                    {ASSISTANT_SUGGESTIONS.map(s => (
                       <button key={s} onClick={() => handleSend(s)}
                         className="text-xs px-3 py-1.5 rounded-full border border-[#5048e5]/30 text-[#5048e5] bg-[#5048e5]/5 hover:bg-[#5048e5]/10 transition-colors font-medium">
                         {s}
@@ -316,7 +296,7 @@ RULES:
               <div>
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">Favorite Categories</p>
                 <div className="flex flex-wrap gap-2">
-                  {CATEGORIES.map(cat => (
+                  {ASSISTANT_CATEGORIES.map(cat => (
                     <button key={cat} onClick={() => toggleCategory(cat)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                         prefs.categories.includes(cat)

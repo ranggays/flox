@@ -11,6 +11,7 @@ import {
   getTicketPDA,
 } from "@/lib/program";
 import { ToastProvider, useToast } from "@/components/Toast";
+import WorkflowAssistant from "@/components/WorkflowAssistant";
 
 interface CheckoutModalProps {
   ticket: any; 
@@ -37,6 +38,17 @@ export default function CheckoutModal({ ticket, event, onClose }: CheckoutModalP
   const subtotal = unitPrice * qty;
   const total = subtotal + SOLANA_BASE_FEE;
   const totalUSD = solPrice !== null ? (total * solPrice).toFixed(2) : "...";
+  const checkoutContext = [
+    `Surface: checkout modal for "${event.title}".`,
+    `Selected tier: ${ticket.name}.`,
+    `Selected quantity: ${qty}.`,
+    `Unit price: ${ticket.price} SOL.`,
+    `Subtotal: ${subtotal.toFixed(4)} SOL.`,
+    `Estimated total with network fee: ${total.toFixed(4)} SOL.`,
+    `Tier availability: ${ticket.available} remaining out of ${ticket.total}.`,
+    `Tier features: ${ticket.features.join(", ")}.`,
+    "If comparing tiers, explain whether the current tier is worth it and mention better alternatives only if supported by the event context.",
+  ].join("\n");
 
   const shortAddress = publicKey 
     ? `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`
@@ -248,6 +260,20 @@ export default function CheckoutModal({ ticket, event, onClose }: CheckoutModalP
                       </p>
                     </div>
                   </div>
+
+                  <WorkflowAssistant
+                    eyebrow="Checkout Copilot"
+                    title="Use the checkout copilot before you approve"
+                    description="Ask for a quick tier breakdown using the ticket you selected, the current quantity, and the event context already on screen."
+                    suggestions={["Compare tiers before I buy"]}
+                    route={`/events/${event.id}`}
+                    surface="checkout-copilot"
+                    workflowContext={checkoutContext}
+                    placeholder="Ask if this tier is the right buy..."
+                    emptyState="Use this to sanity-check the selected tier before you sign the transaction."
+                    eventId={String(event.id)}
+                    tierId={ticket.id}
+                  />
                 </div>
               </div>
 

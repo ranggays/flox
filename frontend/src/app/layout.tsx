@@ -3,12 +3,11 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { WalletProvider } from "@/lib/WalletContext";
 import { AgentDataProvider } from "@/context/AgentDataContext";
-import  FloatingAgent  from "@/components/FloatingAgent";
 
 export const metadata: Metadata = {
-  title: "Flox | Web3 Event Ticketing",
+  title: "Flox | AI Event Concierge",
   description:
-    "Secure, transparent, and NFT-backed ticketing for the next generation of live events.",
+    "AI-guided event discovery with Solana-based ticketing, escrow, and validation.",
 };
 
 const themeInitScript = `
@@ -44,12 +43,11 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-[#f6f6f8] dark:bg-black text-slate-900 dark:text-slate-100 font-sans antialiased transition-colors duration-300">
+      <body className="bg-[#f6f6f8] dark:bg-black text-slate-900 dark:text-slate-100 font-sans antialiased transition-colors duration-300" suppressHydrationWarning>
         <ThemeProvider>
           <WalletProvider>
             <AgentDataProvider>
               {children}
-              <FloatingAgent />
             </AgentDataProvider>
           </WalletProvider>
         </ThemeProvider>
