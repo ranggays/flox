@@ -5,6 +5,26 @@
 @custom-variant dark (&:where(.dark, .dark *));
 @tailwind utilities;
 
+:root {
+  --flox-primary: #5048e5;
+  --flox-primary-foreground: #ffffff;
+  --flox-primary-soft: #eef2ff;
+  --flox-primary-soft-border: #c7d2fe;
+  --flox-surface: #ffffff;
+  --flox-surface-muted: #f8fafc;
+  --flox-border: #e2e8f0;
+}
+
+.dark {
+  --flox-primary: #7c83ff;
+  --flox-primary-foreground: #0f172a;
+  --flox-primary-soft: rgba(80, 72, 229, 0.16);
+  --flox-primary-soft-border: rgba(129, 140, 248, 0.4);
+  --flox-surface: #020617;
+  --flox-surface-muted: #0f172a;
+  --flox-border: #1e293b;
+}
+
 body {
   font-family: "Inter", sans-serif;
 }

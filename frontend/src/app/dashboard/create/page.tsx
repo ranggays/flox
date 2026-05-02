@@ -1,8 +1,7 @@
 "use client";
 import { useState, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { BN } from "@coral-xyz/anchor";
@@ -10,6 +9,7 @@ import { getProgram, getEscrowPDA, getEventPDA, getTierPDA } from "@/lib/program
 import { uploadImageToCloudinary } from "@/lib/uploadImage";
 import { invalidateAllProgramCache } from "@/lib/programCache";
 import { ToastProvider, useToast } from "@/components/Toast";
+import WorkspaceShell from "@/components/workspace/WorkspaceShell";
 
 interface TicketTier {
   id: number;
@@ -19,6 +19,23 @@ interface TicketTier {
 }
 
 type EventType = "physical" | "virtual";
+
+interface RpcCall {
+  rpc(): Promise<unknown>;
+}
+
+interface AccountsBuilder {
+  accounts(accounts: Record<string, unknown>): RpcCall;
+}
+
+interface CreateEventProgram {
+  methods: {
+    initializeEscrow(): AccountsBuilder;
+    stakeForEvent(): AccountsBuilder;
+    createEvent(...args: unknown[]): AccountsBuilder;
+    addTicketTier(...args: unknown[]): AccountsBuilder;
+  };
+}
 
 const SECTIONS = [
   { id: "general",   icon: "info",           label: "General Information" },
@@ -54,7 +71,7 @@ const cardCls = "bg-white dark:bg-slate-900 p-8 rounded-xl shadow-sm border bord
 export default function CreateEventPage() {
   const wallet = useAnchorWallet();
   const { connection } = useConnection();
-  const { success, error: toastError, warning, info } = useToast();
+  const { success, error: toastError, warning } = useToast();
 
   // for form states
   const [eventName,    setEventName]    = useState("");
@@ -114,13 +131,13 @@ export default function CreateEventPage() {
     if (!wallet) return warning("Please connect your Phantom wallet first.");
     setStaking(true);
     try {
-      const program   = getProgram(connection, wallet);
+      const program = getProgram(connection, wallet) as unknown as CreateEventProgram;
       const escrowPDA = getEscrowPDA(wallet.publicKey);
 
       const escrowInfo = await connection.getAccountInfo(escrowPDA);
       if (!escrowInfo) {
         console.log("Creating escrow account...");
-        await (program.methods as any).initializeEscrow()
+        await program.methods.initializeEscrow()
           .accounts({
             escrowAccount: escrowPDA,
             organizer:     wallet.publicKey,
@@ -130,7 +147,7 @@ export default function CreateEventPage() {
       }
 
       console.log("Staking 0.05 SOL...");
-      await (program.methods as any).stakeForEvent()
+      await program.methods.stakeForEvent()
         .accounts({
           escrowAccount: escrowPDA,
           organizer:     wallet.publicKey,
@@ -156,7 +173,7 @@ export default function CreateEventPage() {
 
     setDeploying(true);
     try {
-      const program   = getProgram(connection, wallet);
+      const program = getProgram(connection, wallet) as unknown as CreateEventProgram;
       const escrowPDA = getEscrowPDA(wallet.publicKey);
       const eventId   = new BN(Date.now());
       const eventPDA  = getEventPDA(wallet.publicKey, eventId.toNumber());
@@ -187,7 +204,7 @@ export default function CreateEventPage() {
       const formattedType  = eventType === "physical" ? { physical: {} } : { virtual: {} };
       const formattedCat   = { [category]: {} };
 
-      await (program.methods as any).createEvent(
+      await program.methods.createEvent(
         eventId,
         eventName,
         description || "",
@@ -213,7 +230,7 @@ export default function CreateEventPage() {
         const maxSupply    = parseInt(t.supply || "0");
 
         setDeployStep(`Creating tier ${i + 1}/${tiers.length}: "${t.name || `Tier ${i+1}`}"...`);
-        await (program.methods as any).addTicketTier(
+        await program.methods.addTicketTier(
           i,
           t.name || `Tier ${i + 1}`,
           priceLamport,
@@ -241,27 +258,36 @@ export default function CreateEventPage() {
   if (deployed) {
     return (
       <div className="min-h-screen flex flex-col bg-[#f6f6f8] dark:bg-black">
-        <Header />
-        <main className="flex-1 flex items-center justify-center p-8">
-          <div className="text-center max-w-md">
-            <div className="w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-6">
-              <span className="material-symbols-outlined text-green-600 dark:text-green-400 text-4xl">check_circle</span>
+        <WorkspaceShell
+          eyebrow="Organizer Workspace"
+          title="Event deployed"
+          description="Your organizer flow is complete. Use the next workspace based on whether you want to review performance or inspect the public event listing."
+          contentClassName="flex h-full w-full items-center justify-center px-4 py-8 sm:px-6 lg:px-8"
+        >
+          <div className="w-full max-w-2xl rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+              <span className="material-symbols-outlined text-4xl text-green-600 dark:text-green-400">check_circle</span>
             </div>
-            <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-3">Event Deployed!</h2>
-            <p className="text-slate-500 dark:text-slate-400 mb-8">
-              Your smart contract is live on <b>Solana Devnet</b>. Tickets are ready to sell.
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--flox-primary)]">
+              Organizer Flow Complete
             </p>
-            <div className="flex gap-3 justify-center">
-              <Link href="/dashboard" className="px-6 py-3 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
+            <h2 className="mt-3 text-3xl font-black text-slate-900 dark:text-white">Event deployed</h2>
+            <p className="mt-4 text-slate-500 dark:text-slate-400">
+              Your smart contract is live on <b>Solana Devnet</b>. Tickets are ready to sell and the event can now be reviewed from both the organizer and discover workspaces.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <Link href="/dashboard" className="rounded-xl border border-slate-200 px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                 Back to Dashboard
               </Link>
-              <Link href="/" className="px-6 py-3 bg-[#5048e5] text-white font-bold rounded-xl text-sm hover:bg-[#5048e5]/90 transition-all">
+              <Link href="/discover" className="rounded-xl bg-[#5048e5] px-6 py-3 text-sm font-bold text-white transition-all hover:bg-[#5048e5]/90">
                 View Events
+              </Link>
+              <Link href="/" className="rounded-xl border border-slate-200 px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                Open AI Home
               </Link>
             </div>
           </div>
-        </main>
-        <Footer />
+        </WorkspaceShell>
       </div>
     );
   }
@@ -269,19 +295,43 @@ export default function CreateEventPage() {
   return (
     <>
       <ToastProvider />
-      <div className="min-h-screen flex flex-col bg-[#f6f6f8] dark:bg-black">
-        <Header />
-        <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-12">
+      <WorkspaceShell
+        eyebrow="Organizer Workspace"
+        title="Create new event"
+        description="Build the on-chain event from inside the organizer workspace. AI Home remains the planning surface; this route is for direct execution."
+        contentClassName="mx-auto flex w-full max-w-6xl flex-col px-4 py-8 sm:px-6 lg:px-8"
+        headerActions={
+          <div className="flex items-center gap-2">
+            <Link href="/" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+              <span className="material-symbols-outlined text-base">auto_awesome</span>
+              AI Home
+            </Link>
+            <Link href="/discover" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+              <span className="material-symbols-outlined text-base">travel_explore</span>
+              Discover
+            </Link>
+          </div>
+        }
+      >
+        <main>
 
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+          <div className="mb-10 grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
             <div className="space-y-2">
               <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#5048e5] transition-colors">
                 <span className="material-symbols-outlined text-base">arrow_back</span>
                 Back to Organizer Dashboard
               </Link>
-              <h1 className="text-4xl font-black tracking-tight text-slate-900 dark:text-white">Create New Event</h1>
-              <p className="text-slate-500 dark:text-slate-400 text-lg">Deploy your event smart contract to Solana.</p>
+              <h1 className="text-4xl font-black tracking-tight text-slate-900 dark:text-white">Create new event</h1>
+              <p className="text-lg text-slate-500 dark:text-slate-400">Deploy your event smart contract to Solana from the organizer workspace.</p>
+            </div>
+            <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--flox-primary)]">
+                Workflow Guidance
+              </p>
+              <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-300">
+                Use this page when the event plan is already decided. If you still need help with pricing, positioning, or which audience to target, step back to AI Home first and return here when you are ready to execute.
+              </p>
             </div>
           </div>
 
@@ -425,7 +475,14 @@ export default function CreateEventPage() {
                   }`}>
                   {bannerPreview ? (
                     <div className="relative">
-                      <img src={bannerPreview} alt="Banner" className="w-full h-56 object-cover rounded-xl" />
+                      <Image
+                        src={bannerPreview}
+                        alt="Banner"
+                        width={1200}
+                        height={630}
+                        unoptimized
+                        className="h-56 w-full rounded-xl object-cover"
+                      />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity">
                         <span className="text-white text-sm font-bold flex items-center gap-2">
                           <span className="material-symbols-outlined">edit</span> Change Image
@@ -558,8 +615,7 @@ export default function CreateEventPage() {
             </div>
           </div>
         </main>
-        <Footer />
-      </div>
+      </WorkspaceShell>
     </>
   );
 }

@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import Link from "next/link";
 import TicketList from "@/components/my-tickets/TicketList";
 import { useConnection, useAnchorWallet, useWallet } from "@solana/wallet-adapter-react";
 import { getProgram, fetchOwnerTickets } from "@/lib/program";
 import type { MyTicket } from "@/lib/types";
 import { useAgentData } from "@/context/AgentDataContext";
 import { cachedFetch } from "@/lib/programCache";
+import WorkflowAssistant from "@/components/WorkflowAssistant";
+import WorkspaceShell from "@/components/workspace/WorkspaceShell";
 
 export default function MyTicketsPage() {
   const [tickets, setTickets] = useState<MyTicket[]>([]);
@@ -18,6 +19,20 @@ export default function MyTicketsPage() {
   const { publicKey } = useWallet();
   const anchorWallet = useAnchorWallet();
   const { pushUserTickets } = useAgentData();
+  const ticketWorkflowContext = [
+    `Surface: my tickets page.`,
+    `Wallet connected: ${publicKey ? "yes" : "no"}.`,
+    `Loaded ticket count: ${tickets.length}.`,
+    ...(tickets.length > 0
+      ? [
+          "Loaded tickets:",
+          ...tickets.slice(0, 8).map(
+            (ticket) =>
+              `- ${ticket.title} on ${ticket.date} at ${ticket.time} | status: ${ticket.status} | category: ${ticket.category}`
+          ),
+        ]
+      : ["No tickets are currently loaded for this wallet."]),
+  ].join("\n");
 
   function enumKey(val: Record<string, unknown> | undefined): string {
   return val ? Object.keys(val)[0] : "other";
@@ -69,8 +84,6 @@ export default function MyTicketsPage() {
           const tierMatch  = allRawTiers.find((t: any) => t.publicKey.toBase58() === tierPubkeyStr);
 
           const eData = eventMatch?.account;
-          const tData = tierMatch?.account;
-
           const startTs = eData?.startTime?.toNumber() ?? 0;
           const endTs   = eData?.endTime?.toNumber()   ?? 0;
 
@@ -117,12 +130,16 @@ export default function MyTicketsPage() {
     };
 
     fetchMyTickets();
-  }, [publicKey, anchorWallet, connection]);
+  }, [publicKey, anchorWallet, connection, pushUserTickets]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f6f6f8] dark:bg-black">
-      <Header />
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <WorkspaceShell
+      eyebrow="Buyer Workspace"
+      title="My ticket collection"
+      description="Review wallet-held tickets, understand their current status, and ask for next-step guidance without leaving the buyer workflow."
+      contentClassName="mx-auto flex w-full max-w-5xl flex-col px-4 py-8 sm:px-6 lg:px-8"
+    >
+      <main>
         <div className="mb-8">
           <h2 className="text-4xl font-black text-slate-900 dark:text-white">
             My Ticket Collection
@@ -135,6 +152,22 @@ export default function MyTicketsPage() {
             )}
           </p>
         </div>
+
+        <WorkflowAssistant
+          eyebrow="Ticket Copilot"
+          title="Use the page copilot before you leave this workflow"
+          description="This copilot stays tied to the tickets loaded on this page so it can explain status, timing, and the most relevant next action without acting like a second main assistant."
+          suggestions={[
+            "Explain my ticket status",
+            "What should I do next?",
+          ]}
+          route="/my-tickets"
+          surface="ticket-copilot"
+          workflowContext={ticketWorkflowContext}
+          placeholder="Ask about ticket status, timing, or next steps..."
+          emptyState="Ask the copilot to explain upcoming, attended, or cancelled tickets and suggest the next route or action that makes sense."
+          className="mb-8"
+        />
 
         {/* State Management UI */}
         {!publicKey ? (
@@ -155,17 +188,16 @@ export default function MyTicketsPage() {
             <span className="material-symbols-outlined text-5xl text-slate-400 mb-4">confirmation_number</span>
             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">No Tickets Found</h3>
             <p className="text-slate-500 dark:text-slate-400 mb-6 text-center max-w-sm">
-              You haven't purchased any tickets yet. Explore upcoming events and secure your spot!
+              You haven&apos;t purchased any tickets yet. Explore upcoming events and secure your spot!
             </p>
-            <a href="/#events" className="px-6 py-3 bg-[#5048e5] text-white font-bold rounded-xl hover:bg-[#5048e5]/90 transition-all shadow-lg shadow-[#5048e5]/20">
+            <Link href="/discover" className="px-6 py-3 bg-[#5048e5] text-white font-bold rounded-xl hover:bg-[#5048e5]/90 transition-all shadow-lg shadow-[#5048e5]/20">
               Explore Events
-            </a>
+            </Link>
           </div>
         ) : (
           <TicketList tickets={tickets} />
         )}
       </main>
-      <Footer />
-    </div>
+    </WorkspaceShell>
   );
 }
