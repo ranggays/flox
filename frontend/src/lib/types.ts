@@ -62,7 +62,7 @@ export interface EventDetail {
   organizer?: string;
 }
 
-export type TicketStatus = "upcoming" | "attended" | "listed";
+export type TicketStatus = "upcoming" | "attended" | "listed" | "cancelled";
 
 export interface MyTicket {
   id: string;
@@ -73,4 +73,7 @@ export interface MyTicket {
   time: string;
   imageUrl: string;
   imageAlt: string;
+  eventPDA?: string;
+  tierPDA?: string;
+  organizer?: string;
 }

@@ -1,6 +1,15 @@
+export interface BlockchainTier {
+  id: string;
+  name: string;
+  priceSol: string;
+  available: number;
+  maxSupply: number;
+}
+
 export interface BlockchainEvent {
   id: string;
   name: string;
+  description?: string;
   organizer: string;
   location: string;
   startTime: number;
@@ -12,6 +21,7 @@ export interface BlockchainEvent {
   sold: number;
   available: number;
   revenue: string;
+  tiers: BlockchainTier[];
 }
 
 interface CacheEntry {
