@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 
 interface HeroSectionProps {
   events: any[]; 
@@ -41,7 +42,7 @@ export default function HeroSection({ events }: HeroSectionProps) {
 
   const marqueeItems = events.length > 0 
     ? events.map((e) => e.name) 
-    : ["Web3 Ticketing", "Secure Tickets", "Decentralized Events"];
+    : ["AI Event Discovery", "Solana Ticketing", "Guided Event Search"];
     
   const repeated = Array(5).fill(marqueeItems).flat();
 
@@ -53,34 +54,34 @@ export default function HeroSection({ events }: HeroSectionProps) {
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 backdrop-blur-sm shadow-sm dark:shadow-none">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
             <span className="text-xs text-slate-500 dark:text-slate-400 font-medium tracking-wide">
-              Powered by Solana 
+              AI-guided discovery on Solana
             </span>
           </div>
 
           {/* Headline */}
           <h1 className="text-6xl md:text-7xl font-black text-slate-900 dark:text-white leading-tight tracking-tight">
-            Web3 Ticketing{" "}
-            <span className="text-[#5048e5]">Platform</span>
+            Find Better Events{" "}
+            <span className="text-[#5048e5]">With AI</span>
           </h1>
 
           <p className="text-slate-500 dark:text-slate-400 text-lg max-w-2xl mx-auto leading-relaxed">
-            Secure, transparent, and decentralized ticket marketplace powered
-            by blockchain technology. Own your tickets, control your experience.
+            Flox helps people discover, compare, and understand events with AI,
+            while Solana handles ticket ownership, escrow, and validation in the background.
           </p>
 
           <div className="flex items-center justify-center gap-4 pt-2">
-            <a
-              href="#events"
+            <Link
+              href="/discover"
               className="px-8 py-3 bg-[#5048e5] text-white font-bold rounded-xl hover:bg-[#5048e5]/90 transition-all text-sm shadow-lg shadow-[#5048e5]/20"
             >
               Explore Events
-            </a>
-            <a
+            </Link>
+            <Link
               href="/dashboard"
               className="px-8 py-3 border border-slate-200 dark:border-white/20 text-slate-700 dark:text-white font-bold rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 transition-all text-sm"
             >
               Create Event
-            </a>
+            </Link>
           </div>
         </div>
 

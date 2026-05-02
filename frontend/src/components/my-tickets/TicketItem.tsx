@@ -6,9 +6,10 @@ import { useConnection, useAnchorWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { getProgram, claimRefund, getEscrowPDA } from "@/lib/program";
 import { ToastProvider, useToast } from "../Toast";
+import type { MyTicket } from "@/lib/types";
 
 interface TicketItemProps {
-  ticket: any; 
+  ticket: MyTicket;
 }
 
 const STATUS_CONFIG: Record<string, any> = {
@@ -59,6 +60,9 @@ export default function TicketItem({ ticket }: TicketItemProps) {
 
   const handleRefund = async () => {
     if (!wallet) return warning("Please connect a wallet!");
+    if (!ticket.eventPDA || !ticket.tierPDA || !ticket.organizer) {
+      return warning("Refund details are missing for this ticket.");
+    }
 
     try {
       setIsRefunding(true);

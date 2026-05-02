@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { MyTicket, TicketStatus } from "@/lib/types";
+import type { MyTicket } from "@/lib/types";
 import TicketItem from "@/components/my-tickets/TicketItem";
 
 interface TicketListProps {

@@ -5,8 +5,8 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
       </svg>
     ),
-    title: "Secure & Transparent",
-    description: "All tickets are minted on the blockchain, ensuring authenticity and preventing fraud with immutable records.",
+    title: "Grounded Event Answers",
+    description: "Flox AI answers questions using live event, ticket, and wallet context so users can understand options before acting.",
   },
   {
     icon: (
@@ -14,8 +14,8 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
-    title: "Instant Delivery",
-    description: "Receive your ticket immediately after purchase confirmation on the blockchain — no waiting, no intermediaries.",
+    title: "AI-Guided Decisions",
+    description: "Use natural language to compare events, understand ticket tiers, and get guidance instead of navigating every detail manually.",
   },
   {
     icon: (
@@ -23,8 +23,8 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
-    title: "Easy Check-in",
-    description: "Simple QR code verification system for seamless event entry. Validators scan your ticket on-site in seconds.",
+    title: "Trusted On-Chain Fulfillment",
+    description: "Ticket purchase, escrow, and validation still happen on Solana, giving the product a reliable execution layer behind the AI experience.",
   },
 ];
 
@@ -37,7 +37,7 @@ export default function FeaturesSection() {
             Why Flox?
           </h2>
           <p className="text-slate-500 dark:text-slate-400 max-w-xl mx-auto">
-            The most secure and transparent Web3 ticketing platform, built for the next generation of events.
+            An AI-first event experience with blockchain used where trust and settlement actually matter.
           </p>
         </div>
 

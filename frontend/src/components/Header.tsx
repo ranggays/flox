@@ -11,9 +11,9 @@ import { useIsValidator } from "@/hooks/useIsValidator";
 import ConnectWalletButton from "@/components/ConnectWalletButton";
 
 const baseNavLinks = [
-  { label: "Explore",     href: "/" },
-  { label: "My Tickets",  href: "/my-tickets" },
-  { label: "Marketplace", href: "#" },
+  { label: "Discover",   href: "/discover" },
+  { label: "My Tickets", href: "/my-tickets" },
+  { label: "Organizer",  href: "/dashboard" },
 ];
 
 function shortenAddress(address: string) {
