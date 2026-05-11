@@ -1,5 +1,3 @@
-# Hello Everyone, I am Ray and this is my first project for hackaton (so still a new in this field)
-
 # Flox — User Guide
 
 > Flox is a secure, transparent, and intermediary-free event ticketing platform built on the Solana blockchain.
