@@ -29,7 +29,7 @@ interface NavItem {
 const BASE_NAV_ITEMS: NavItem[] = [
   {
     label: "AI Home",
-    href: "/",
+    href: "/app",
     description: "Start with AI-led guidance and route orchestration.",
     icon: "auto_awesome",
   },
@@ -58,7 +58,7 @@ function shortenAddress(address: string) {
 }
 
 function isItemActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/" || pathname === "/prototypes/chat-home";
+  if (href === "/app") return pathname === "/app" || pathname === "/prototypes/chat-home";
   if (href === "/dashboard") return pathname.startsWith("/dashboard");
   return pathname === href;
 }
@@ -100,7 +100,7 @@ function NavigationContent({
     <>
       <div className="border-b border-slate-200 p-4 dark:border-zinc-800/80">
         <Link
-          href="/"
+          href="/app"
           onClick={onNavigate}
           className="flex items-center gap-3 rounded-xl px-2 py-1"
         >

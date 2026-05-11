@@ -271,7 +271,7 @@ export default function DiscoverPage() {
       description="Use this page when you already know you want the visual catalog. AI Home is the main decision surface, and this workspace handles direct exploration."
       contentClassName="mx-auto flex w-full max-w-7xl flex-col px-4 py-8 sm:px-6 lg:px-8"
       headerActions={
-        <Link href="/" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+        <Link href="/app" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
           <span className="material-symbols-outlined text-base">auto_awesome</span>
           Back to AI Home
         </Link>

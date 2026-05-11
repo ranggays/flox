@@ -23,7 +23,7 @@ const STORAGE_KEY = "flox-chat-home-orchestrator-messages";
 const NAV_ITEMS = [
   {
     label: "AI Home",
-    href: "/",
+    href: "/app",
     description: "Start with AI-led guidance and route orchestration.",
     icon: "auto_awesome",
     current: true,
@@ -290,7 +290,7 @@ function NavigationContent({
     <>
       <div className="border-b border-slate-200 p-4 dark:border-zinc-800/80">
         <Link
-          href="/"
+          href="/app"
           onClick={onNavigate}
           className="flex items-center gap-3 rounded-xl px-2 py-1"
         >
