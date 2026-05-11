@@ -282,7 +282,7 @@ export default function CreateEventPage() {
               <Link href="/discover" className="rounded-xl bg-[#5048e5] px-6 py-3 text-sm font-bold text-white transition-all hover:bg-[#5048e5]/90">
                 View Events
               </Link>
-              <Link href="/" className="rounded-xl border border-slate-200 px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+              <Link href="/app" className="rounded-xl border border-slate-200 px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                 Open AI Home
               </Link>
             </div>
@@ -302,7 +302,7 @@ export default function CreateEventPage() {
         contentClassName="mx-auto flex w-full max-w-6xl flex-col px-4 py-8 sm:px-6 lg:px-8"
         headerActions={
           <div className="flex items-center gap-2">
-            <Link href="/" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+            <Link href="/app" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
               <span className="material-symbols-outlined text-base">auto_awesome</span>
               AI Home
             </Link>

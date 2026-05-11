@@ -54,7 +54,7 @@ const ROLE_CARDS = [
     bg: "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800",
     steps: [
       "Connect Phantom Wallet",
-      "Browse events on homepage",
+      "Open the app or browse the event catalog",
       "Select a ticket tier & buy",
       "Ticket stored in your wallet",
       "Show QR code at event entrance",
@@ -404,7 +404,7 @@ export default function DocsPage() {
               </div>
 
               <p className="text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
-                AI Home is the main assistant surface for Flox. It reads the same live on-chain product context used across discovery, tickets, and organizer workflows, so it can guide users without duplicating the core browsing and workspace pages.
+                AI Home is the main assistant surface inside the Flox app. It reads the same live on-chain product context used across discovery, tickets, and organizer workflows, so it can guide users without duplicating the core browsing and workspace pages.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
