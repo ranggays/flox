@@ -36,6 +36,7 @@ pub mod locketing_contract {
     pub fn create_event(
         ctx: Context<CreateEvent>,
         event_id: u64,
+        expected_tier_count: u8,
         name: String,
         description: String,
         category: Category,
@@ -67,6 +68,14 @@ pub mod locketing_contract {
         event.tier_count = 0;
         event.bump = ctx.bumps.event_account;
 
+        let deployment = &mut ctx.accounts.deployment_state_account;
+        deployment.event = event.key();
+        deployment.organizer = ctx.accounts.organizer.key();
+        deployment.expected_tier_count = expected_tier_count;
+        deployment.created_tier_count = 0;
+        deployment.status = DeploymentStatus::Building;
+        deployment.bump = ctx.bumps.deployment_state_account;
+
         escrow.event_count = escrow.event_count.checked_add(1).unwrap();
         Ok(())
     }
@@ -78,6 +87,16 @@ pub mod locketing_contract {
         price: u64,
         max_supply: u32,
     ) -> Result<()> {
+        let deployment = &mut ctx.accounts.deployment_state_account;
+        require!(
+            deployment.status == DeploymentStatus::Building,
+            CustomError::DeploymentNotBuilding
+        );
+        require!(
+            deployment.created_tier_count < deployment.expected_tier_count,
+            CustomError::DeploymentTierOverflow
+        );
+
         let tier = &mut ctx.accounts.tier_account;
         tier.event = ctx.accounts.event_account.key();
         tier.tier_index = tier_index;
@@ -90,6 +109,35 @@ pub mod locketing_contract {
 
         let event = &mut ctx.accounts.event_account;
         event.tier_count = event.tier_count.checked_add(1).unwrap();
+        deployment.created_tier_count = deployment.created_tier_count.checked_add(1).unwrap();
+        Ok(())
+    }
+
+    pub fn finalize_event_deployment(ctx: Context<FinalizeEventDeployment>) -> Result<()> {
+        let deployment = &mut ctx.accounts.deployment_state_account;
+
+        require!(
+            deployment.status == DeploymentStatus::Building,
+            CustomError::DeploymentNotBuilding
+        );
+        require!(
+            deployment.created_tier_count == deployment.expected_tier_count,
+            CustomError::DeploymentNotReady
+        );
+
+        deployment.status = DeploymentStatus::Ready;
+        Ok(())
+    }
+
+    pub fn abandon_event_deployment(ctx: Context<AbandonEventDeployment>) -> Result<()> {
+        let deployment = &mut ctx.accounts.deployment_state_account;
+
+        require!(
+            deployment.status == DeploymentStatus::Building,
+            CustomError::DeploymentNotBuilding
+        );
+
+        deployment.status = DeploymentStatus::Abandoned;
         Ok(())
     }
 
@@ -232,6 +280,14 @@ pub struct StakeForEvent<'info> {
 pub struct CreateEvent<'info> {
     #[account(init, payer = organizer, space = 8 + 32 + 8 + 104 + 508 + 1 + 1 + 204 + 8 + 8 + 104 + 104 + 1 + 8 + 4 + 1 + 1, seeds = [b"event", organizer.key().as_ref(), &event_id.to_le_bytes()], bump)]
     pub event_account: Account<'info, EventAccount>,
+    #[account(
+        init,
+        payer = organizer,
+        space = 8 + 32 + 32 + 1 + 1 + 1 + 1,
+        seeds = [b"deployment", event_account.key().as_ref()],
+        bump
+    )]
+    pub deployment_state_account: Account<'info, DeploymentStateAccount>,
     #[account(mut, has_one = organizer)]
     pub escrow_account: Account<'info, EscrowAccount>,
     #[account(mut)]
@@ -244,11 +300,51 @@ pub struct CreateEvent<'info> {
 pub struct AddTicketTier<'info> {
     #[account(mut, has_one = organizer)]
     pub event_account: Account<'info, EventAccount>,
+    #[account(
+        mut,
+        seeds = [b"deployment", event_account.key().as_ref()],
+        bump = deployment_state_account.bump,
+        constraint = deployment_state_account.event == event_account.key(),
+        has_one = organizer
+    )]
+    pub deployment_state_account: Account<'info, DeploymentStateAccount>,
     #[account(init, payer = organizer, space = 8 + 32 + 1 + 54 + 8 + 4 + 4 + 1 + 1, seeds = [b"tier", event_account.key().as_ref(), &[tier_index]], bump)]
     pub tier_account: Account<'info, TicketTierAccount>,
     #[account(mut)]
     pub organizer: Signer<'info>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct FinalizeEventDeployment<'info> {
+    #[account(has_one = organizer)]
+    pub event_account: Account<'info, EventAccount>,
+    #[account(
+        mut,
+        seeds = [b"deployment", event_account.key().as_ref()],
+        bump = deployment_state_account.bump,
+        constraint = deployment_state_account.event == event_account.key(),
+        has_one = organizer
+    )]
+    pub deployment_state_account: Account<'info, DeploymentStateAccount>,
+    #[account(mut)]
+    pub organizer: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct AbandonEventDeployment<'info> {
+    #[account(has_one = organizer)]
+    pub event_account: Account<'info, EventAccount>,
+    #[account(
+        mut,
+        seeds = [b"deployment", event_account.key().as_ref()],
+        bump = deployment_state_account.bump,
+        constraint = deployment_state_account.event == event_account.key(),
+        has_one = organizer
+    )]
+    pub deployment_state_account: Account<'info, DeploymentStateAccount>,
+    #[account(mut)]
+    pub organizer: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -336,6 +432,8 @@ pub enum EventStatus { Active, Cancelled, Ended }
 pub enum Category { Music, Conference, Sports, Art, Hackathon, Workshop, Other }
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
 pub enum EventType { Physical, Virtual }
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
+pub enum DeploymentStatus { Building, Ready, Abandoned }
 
 #[account] pub struct EscrowAccount { 
     pub organizer: Pubkey, 
@@ -361,6 +459,15 @@ pub enum EventType { Physical, Virtual }
     pub tickets_sold: u32, 
     pub tier_count: u8, 
     pub bump: u8, }
+
+#[account] pub struct DeploymentStateAccount {
+    pub event: Pubkey,
+    pub organizer: Pubkey,
+    pub expected_tier_count: u8,
+    pub created_tier_count: u8,
+    pub status: DeploymentStatus,
+    pub bump: u8,
+}
     
 #[account] pub struct TicketTierAccount { 
     pub event: Pubkey, 
@@ -407,4 +514,10 @@ pub enum CustomError {
     InsufficientEscrow,
     #[msg("Hanya bisa refund untuk event yang dibatalkan")]
     EventNotCancelled,
+    #[msg("Deployment event ini tidak sedang dalam status building.")]
+    DeploymentNotBuilding,
+    #[msg("Deployment event ini belum siap dipublikasikan.")]
+    DeploymentNotReady,
+    #[msg("Jumlah tier yang dibuat melebihi target deployment.")]
+    DeploymentTierOverflow,
 }
