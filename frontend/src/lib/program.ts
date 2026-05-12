@@ -16,6 +16,20 @@ export const PROGRAM_ID = new PublicKey(
 
 export const REQUIRED_STAKE = 50_000_000;
 
+export type DeploymentStatusKey = "building" | "ready" | "abandoned";
+
+export interface DeploymentStateRecord {
+  publicKey: PublicKey;
+  account: {
+    event: PublicKey;
+    organizer: PublicKey;
+    expectedTierCount: number | { toNumber(): number };
+    createdTierCount: number | { toNumber(): number };
+    status: Record<string, unknown>;
+    bump: number;
+  };
+}
+
 export function getProgram(connection: Connection, wallet: AnchorWallet) {
   const provider = new AnchorProvider(connection, wallet, {
     commitment: "confirmed",
@@ -46,6 +60,13 @@ export function getEventPDA(organizer: PublicKey, eventId: number): PublicKey {
 export function getTierPDA(eventPDA: PublicKey, tierIndex: number): PublicKey {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("tier"), eventPDA.toBuffer(), Buffer.from([tierIndex])],
+    PROGRAM_ID
+  )[0];
+}
+
+export function getDeploymentStatePDA(eventPDA: PublicKey): PublicKey {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("deployment"), eventPDA.toBuffer()],
     PROGRAM_ID
   )[0];
 }
@@ -105,6 +126,7 @@ export async function createEvent(
   organizer: PublicKey,
   params: {
     eventId: number;
+    expectedTierCount: number;
     name: string;
     description: string;
     category: object;
@@ -122,6 +144,7 @@ export async function createEvent(
   return (program.methods as any)
     .createEvent(
       new BN(params.eventId),
+      params.expectedTierCount,
       params.name,
       params.description,
       params.category,
@@ -134,6 +157,7 @@ export async function createEvent(
     )
     .accounts({
       eventAccount: eventPDA,
+      deploymentStateAccount: getDeploymentStatePDA(eventPDA),
       escrowAccount: escrowPDA,
       organizer,
       systemProgram: SystemProgram.programId,
@@ -161,9 +185,40 @@ export async function addTicketTier(
     .addTicketTier(tier.tierIndex, tier.name, priceLamports, tier.maxSupply)
     .accounts({
       eventAccount: eventPDA,
+      deploymentStateAccount: getDeploymentStatePDA(eventPDA),
       tierAccount: tierPDA,
       organizer,
       systemProgram: SystemProgram.programId,
+    })
+    .rpc();
+}
+
+export async function finalizeEventDeployment(
+  program: LocketingProgram,
+  organizer: PublicKey,
+  eventPDA: PublicKey
+) {
+  return (program.methods as any)
+    .finalizeEventDeployment()
+    .accounts({
+      eventAccount: eventPDA,
+      deploymentStateAccount: getDeploymentStatePDA(eventPDA),
+      organizer,
+    })
+    .rpc();
+}
+
+export async function abandonEventDeployment(
+  program: LocketingProgram,
+  organizer: PublicKey,
+  eventPDA: PublicKey
+) {
+  return (program.methods as any)
+    .abandonEventDeployment()
+    .accounts({
+      eventAccount: eventPDA,
+      deploymentStateAccount: getDeploymentStatePDA(eventPDA),
+      organizer,
     })
     .rpc();
 }
@@ -302,6 +357,27 @@ export async function fetchOrganizerEvents(
   ]);
 }
 
+export async function fetchDeploymentState(
+  program: LocketingProgram,
+  eventPDA: PublicKey
+) {
+  try {
+    return await (program.account as any).deploymentStateAccount.fetch(
+      getDeploymentStatePDA(eventPDA)
+    );
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchAllDeploymentStates(program: LocketingProgram) {
+  try {
+    return (await (program.account as any).deploymentStateAccount.all()) as DeploymentStateRecord[];
+  } catch {
+    return [] as DeploymentStateRecord[];
+  }
+}
+
 export async function fetchEventTiers(
   program: LocketingProgram,
   eventPDA: PublicKey
@@ -327,4 +403,13 @@ export async function fetchEventValidators(
   return (program.account as any).validatorAccount.all([
     { memcmp: { offset: 8, bytes: eventPDA.toBase58() } },
   ]);
+}
+
+export function toDeploymentStatusKey(status: Record<string, unknown> | undefined): DeploymentStatusKey {
+  if (!status) return "building";
+  const key = Object.keys(status)[0];
+  if (key === "ready" || key === "abandoned" || key === "building") {
+    return key;
+  }
+  return "building";
 }

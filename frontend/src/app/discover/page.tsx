@@ -52,6 +52,11 @@ interface RawProgramAccount<T> {
   account: T;
 }
 
+interface RawDeploymentStateAccountData {
+  event: AddressLike;
+  status?: EnumLike;
+}
+
 interface DiscoverProgram {
   account: {
     eventAccount: {
@@ -59,6 +64,9 @@ interface DiscoverProgram {
     };
     ticketTierAccount: {
       all(): Promise<Array<RawProgramAccount<RawTierAccountData>>>;
+    };
+    deploymentStateAccount: {
+      all(): Promise<Array<RawProgramAccount<RawDeploymentStateAccountData>>>;
     };
   };
 }
@@ -119,6 +127,20 @@ function enumKey(val: Record<string, unknown>): string {
   return val ? Object.keys(val)[0] : "unknown";
 }
 
+function filterPublicVisibleEvents(
+  events: Array<RawProgramAccount<RawEventAccountData>>,
+  deploymentStates: Array<RawProgramAccount<RawDeploymentStateAccountData>>
+) {
+  const deploymentStatusByEvent = new Map(
+    deploymentStates.map((state) => [toBase58(state.account.event), enumKey(state.account.status ?? {})])
+  );
+
+  return events.filter((event) => {
+    const deploymentStatus = deploymentStatusByEvent.get(event.publicKey.toBase58());
+    return !deploymentStatus || deploymentStatus === "ready";
+  });
+}
+
 export default function DiscoverPage() {
   const [events, setEvents] = useState<BlockchainEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -156,7 +178,7 @@ export default function DiscoverPage() {
         provider
       ) as unknown as DiscoverProgram;
 
-      const [rawEvents, rawTiers] = await fetchWithRetry(() =>
+      const [rawEvents, rawTiers, rawDeploymentStates] = await fetchWithRetry(() =>
         Promise.all([
           cachedFetch<Array<RawProgramAccount<RawEventAccountData>>>("eventAccount", () =>
             program.account.eventAccount.all()
@@ -164,10 +186,14 @@ export default function DiscoverPage() {
           cachedFetch<Array<RawProgramAccount<RawTierAccountData>>>("ticketTierAccount", () =>
             program.account.ticketTierAccount.all()
           ),
+          cachedFetch<Array<RawProgramAccount<RawDeploymentStateAccountData>>>(
+            "deploymentStateAccount",
+            () => program.account.deploymentStateAccount.all()
+          ),
         ])
       );
 
-      const formatted: BlockchainEvent[] = rawEvents
+      const formatted: BlockchainEvent[] = filterPublicVisibleEvents(rawEvents, rawDeploymentStates)
         .filter((evt) => enumKey(evt.account.status) === "active")
         .map((evt) => {
           const data = evt.account;

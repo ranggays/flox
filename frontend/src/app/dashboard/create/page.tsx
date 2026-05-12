@@ -1,11 +1,18 @@
 "use client";
-import { useState, useRef } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
-import { SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { BN } from "@coral-xyz/anchor";
-import { getProgram, getEscrowPDA, getEventPDA, getTierPDA } from "@/lib/program";
+import {
+  getDeploymentStatePDA,
+  getEscrowPDA,
+  getEventPDA,
+  getProgram,
+  getTierPDA,
+  toDeploymentStatusKey,
+} from "@/lib/program";
 import { uploadImageToCloudinary } from "@/lib/uploadImage";
 import { invalidateAllProgramCache } from "@/lib/programCache";
 import { ToastProvider, useToast } from "@/components/Toast";
@@ -19,6 +26,26 @@ interface TicketTier {
 }
 
 type EventType = "physical" | "virtual";
+type DeploymentSessionStatus = "building" | "ready" | "abandoned";
+
+interface PendingDeploymentSession {
+  organizer: string;
+  eventId: number;
+  eventPDA: string;
+  eventName: string;
+  description: string;
+  category: string;
+  eventType: EventType;
+  location: string;
+  startDate: string;
+  endDate: string;
+  imageUri: string;
+  tiers: TicketTier[];
+  expectedTierCount: number;
+  completedTierCount: number;
+  failedTierIndex: number | null;
+  deploymentStatus: DeploymentSessionStatus;
+}
 
 interface RpcCall {
   rpc(): Promise<unknown>;
@@ -34,6 +61,17 @@ interface CreateEventProgram {
     stakeForEvent(): AccountsBuilder;
     createEvent(...args: unknown[]): AccountsBuilder;
     addTicketTier(...args: unknown[]): AccountsBuilder;
+    finalizeEventDeployment(): AccountsBuilder;
+    abandonEventDeployment(): AccountsBuilder;
+  };
+  account: {
+    deploymentStateAccount: {
+      fetch(publicKey: PublicKey): Promise<{
+        createdTierCount: { toNumber(): number } | number;
+        expectedTierCount: { toNumber(): number } | number;
+        status: Record<string, unknown>;
+      }>;
+    };
   };
 }
 
@@ -67,6 +105,30 @@ function Label({ children }: { children: React.ReactNode }) {
 
 const inputCls = "w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5048e5]/40 focus:border-[#5048e5] transition-all text-sm";
 const cardCls = "bg-white dark:bg-slate-900 p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800";
+const PENDING_DEPLOYMENT_STORAGE_KEY = "flox-pending-event-deployment";
+
+function readPendingDeploymentSession(): PendingDeploymentSession | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(PENDING_DEPLOYMENT_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as PendingDeploymentSession;
+  } catch {
+    return null;
+  }
+}
+
+function writePendingDeploymentSession(session: PendingDeploymentSession | null) {
+  if (typeof window === "undefined") return;
+
+  if (!session) {
+    window.localStorage.removeItem(PENDING_DEPLOYMENT_STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(PENDING_DEPLOYMENT_STORAGE_KEY, JSON.stringify(session));
+}
 
 export default function CreateEventPage() {
   const wallet = useAnchorWallet();
@@ -97,8 +159,35 @@ export default function CreateEventPage() {
   const [uploadProgress,  setUploadProgress]  = useState(0);
   const [uploading,       setUploading]       = useState(false);
   const [activeSection,   setActiveSection]   = useState("general");
+  const [pendingDeployment, setPendingDeployment] = useState<PendingDeploymentSession | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const session = wallet ? readPendingDeploymentSession() : null;
+    const nextSession =
+      wallet && session?.organizer === wallet.publicKey.toBase58() ? session : null;
+
+    startTransition(() => {
+      setPendingDeployment(nextSession);
+
+      if (!nextSession) {
+        return;
+      }
+
+      setEventName(nextSession.eventName);
+      setDescription(nextSession.description);
+      setCategory(nextSession.category);
+      setEventType(nextSession.eventType);
+      setLocation(nextSession.location);
+      setStartDate(nextSession.startDate);
+      setEndDate(nextSession.endDate);
+      setTiers(nextSession.tiers);
+      if (nextSession.imageUri) {
+        setBannerPreview(nextSession.imageUri);
+      }
+    });
+  }, [wallet]);
 
   // for tier helpers
   const addTier    = () => setTiers(p => [...p, { id: Date.now(), name: "", price: "", supply: "" }]);
@@ -124,6 +213,93 @@ export default function CreateEventPage() {
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
     setActiveSection(id);
+  };
+
+  const persistPendingDeployment = (session: PendingDeploymentSession | null) => {
+    writePendingDeploymentSession(session);
+    setPendingDeployment(session);
+  };
+
+  const clearPendingDeployment = () => {
+    persistPendingDeployment(null);
+  };
+
+  const syncPendingDeploymentFromChain = async (
+    program: CreateEventProgram,
+    eventPDA: PublicKey,
+    fallback: PendingDeploymentSession
+  ) => {
+    const deploymentState = await program.account.deploymentStateAccount.fetch(
+      getDeploymentStatePDA(eventPDA)
+    );
+    const synced: PendingDeploymentSession = {
+      ...fallback,
+      completedTierCount:
+        typeof deploymentState.createdTierCount === "number"
+          ? deploymentState.createdTierCount
+          : deploymentState.createdTierCount.toNumber(),
+      expectedTierCount:
+        typeof deploymentState.expectedTierCount === "number"
+          ? deploymentState.expectedTierCount
+          : deploymentState.expectedTierCount.toNumber(),
+      deploymentStatus: toDeploymentStatusKey(deploymentState.status),
+    };
+
+    persistPendingDeployment(synced);
+    return synced;
+  };
+
+  const submitMissingTiers = async (
+    program: CreateEventProgram,
+    organizer: PublicKey,
+    eventPDA: PublicKey,
+    session: PendingDeploymentSession
+  ) => {
+    for (let i = session.completedTierCount; i < session.expectedTierCount; i++) {
+      const tier = session.tiers[i];
+      if (!tier) {
+        throw new Error(`Missing saved tier definition for index ${i}.`);
+      }
+      const tierPDA = getTierPDA(eventPDA, i);
+      const priceLamport = new BN(Math.round(parseFloat(tier.price || "0") * LAMPORTS_PER_SOL));
+      const maxSupply = parseInt(tier.supply || "0");
+
+      setDeployStep(`Creating tier ${i + 1}/${session.expectedTierCount}: "${tier.name || `Tier ${i + 1}`}"...`);
+
+      try {
+        await program.methods.addTicketTier(
+          i,
+          tier.name || `Tier ${i + 1}`,
+          priceLamport,
+          maxSupply
+        ).accounts({
+          eventAccount: eventPDA,
+          deploymentStateAccount: getDeploymentStatePDA(eventPDA),
+          tierAccount: tierPDA,
+          organizer,
+          systemProgram: SystemProgram.programId,
+        }).rpc();
+      } catch (err) {
+        const failedSession: PendingDeploymentSession = {
+          ...session,
+          failedTierIndex: i,
+          deploymentStatus: "building",
+        };
+        persistPendingDeployment(failedSession);
+        throw err;
+      }
+
+      const nextSession: PendingDeploymentSession = {
+        ...session,
+        completedTierCount: i + 1,
+        failedTierIndex: null,
+        deploymentStatus: "building",
+      };
+      session = nextSession;
+      persistPendingDeployment(nextSession);
+    }
+
+    return session;
   };
 
   // function stake so that eo cant cheat 
@@ -170,6 +346,9 @@ export default function CreateEventPage() {
     if (!wallet)    return warning("Wallet not connected.");
     if (!eventName) return warning("Event name is required.");
     if (!startDate || !endDate) return warning("Start and end date are required.");
+    if (pendingDeployment) {
+      return warning("Resume or abandon the pending deployment before starting a new one.");
+    }
 
     setDeploying(true);
     try {
@@ -206,6 +385,7 @@ export default function CreateEventPage() {
 
       await program.methods.createEvent(
         eventId,
+        tiers.length,
         eventName,
         description || "",
         formattedCat,
@@ -216,40 +396,123 @@ export default function CreateEventPage() {
         imageUri,       
         ""              
       ).accounts({
-        eventAccount:  eventPDA,
+        eventAccount: eventPDA,
+        deploymentStateAccount: getDeploymentStatePDA(eventPDA),
         escrowAccount: escrowPDA,
-        organizer:     wallet.publicKey,
+        organizer: wallet.publicKey,
         systemProgram: SystemProgram.programId,
       }).rpc();
 
-      // add ticket tier (per tier)
-      for (let i = 0; i < tiers.length; i++) {
-        const t            = tiers[i];
-        const tierPDA      = getTierPDA(eventPDA, i);
-        const priceLamport = new BN(Math.round(parseFloat(t.price || "0") * LAMPORTS_PER_SOL));
-        const maxSupply    = parseInt(t.supply || "0");
+      let session: PendingDeploymentSession = {
+        organizer: wallet.publicKey.toBase58(),
+        eventId: eventId.toNumber(),
+        eventPDA: eventPDA.toBase58(),
+        eventName,
+        description,
+        category,
+        eventType,
+        location,
+        startDate,
+        endDate,
+        imageUri,
+        tiers,
+        expectedTierCount: tiers.length,
+        completedTierCount: 0,
+        failedTierIndex: null,
+        deploymentStatus: "building",
+      };
+      persistPendingDeployment(session);
 
-        setDeployStep(`Creating tier ${i + 1}/${tiers.length}: "${t.name || `Tier ${i+1}`}"...`);
-        await program.methods.addTicketTier(
-          i,
-          t.name || `Tier ${i + 1}`,
-          priceLamport,
-          maxSupply
-        ).accounts({
-          eventAccount:  eventPDA,
-          tierAccount:   tierPDA,
-          organizer:     wallet.publicKey,
-          systemProgram: SystemProgram.programId,
-        }).rpc();
-      }
+      session = await submitMissingTiers(program, wallet.publicKey, eventPDA, session);
+      setDeployStep("Finalizing deployment...");
+      await program.methods.finalizeEventDeployment().accounts({
+        eventAccount: eventPDA,
+        deploymentStateAccount: getDeploymentStatePDA(eventPDA),
+        organizer: wallet.publicKey,
+      }).rpc();
+      persistPendingDeployment({
+        ...session,
+        deploymentStatus: "ready",
+      });
 
       setDeployStep("");
       invalidateAllProgramCache();
+      clearPendingDeployment();
       setDeployed(true);
+      success("Deployment finished. The event is now public.");
     } catch (err) {
       console.error("Deploy failed:", err);
-      toastError("Deploy failed. Check the console for details.");
+      toastError("Deploy interrupted. Resume the pending deployment to finish missing tiers.");
       setDeployStep("");
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  const handleResumeDeployment = async () => {
+    if (!wallet) return warning("Wallet not connected.");
+    if (!pendingDeployment) return warning("No pending deployment was found.");
+
+    setDeploying(true);
+    try {
+      const program = getProgram(connection, wallet) as unknown as CreateEventProgram;
+      const eventPDA = new PublicKey(pendingDeployment.eventPDA);
+      let session = await syncPendingDeploymentFromChain(program, eventPDA, pendingDeployment);
+
+      if (session.deploymentStatus === "ready") {
+        clearPendingDeployment();
+        invalidateAllProgramCache();
+        setDeployed(true);
+        success("This deployment was already finalized.");
+        return;
+      }
+
+      if (session.deploymentStatus === "abandoned") {
+        warning("This deployment is marked abandoned and cannot be resumed.");
+        return;
+      }
+
+      session = await submitMissingTiers(program, wallet.publicKey, eventPDA, session);
+      setDeployStep("Finalizing deployment...");
+      await program.methods.finalizeEventDeployment().accounts({
+        eventAccount: eventPDA,
+        deploymentStateAccount: getDeploymentStatePDA(eventPDA),
+        organizer: wallet.publicKey,
+      }).rpc();
+      invalidateAllProgramCache();
+      clearPendingDeployment();
+      setDeployStep("");
+      setDeployed(true);
+      success("Deployment resumed and finalized successfully.");
+    } catch (err) {
+      console.error("Resume failed:", err);
+      toastError("Resume failed. The pending deployment is still saved.");
+      setDeployStep("");
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  const handleAbandonDeployment = async () => {
+    if (!wallet) return warning("Wallet not connected.");
+    if (!pendingDeployment) return warning("No pending deployment was found.");
+
+    setDeploying(true);
+    try {
+      const program = getProgram(connection, wallet) as unknown as CreateEventProgram;
+      const eventPDA = new PublicKey(pendingDeployment.eventPDA);
+      await program.methods.abandonEventDeployment().accounts({
+        eventAccount: eventPDA,
+        deploymentStateAccount: getDeploymentStatePDA(eventPDA),
+        organizer: wallet.publicKey,
+      }).rpc();
+      invalidateAllProgramCache();
+      clearPendingDeployment();
+      setDeployStep("");
+      success("Pending deployment marked as abandoned and will stay hidden.");
+    } catch (err) {
+      console.error("Abandon failed:", err);
+      toastError("Unable to abandon the pending deployment.");
     } finally {
       setDeploying(false);
     }
@@ -325,17 +588,56 @@ export default function CreateEventPage() {
               <h1 className="text-4xl font-black tracking-tight text-slate-900 dark:text-white">Create new event</h1>
               <p className="text-lg text-slate-500 dark:text-slate-400">Deploy your event smart contract to Solana from the organizer workspace.</p>
             </div>
-            <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--flox-primary)]">
-                Workflow Guidance
-              </p>
+	            <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+	              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--flox-primary)]">
+	                Workflow Guidance
+	              </p>
               <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-300">
                 Use this page when the event plan is already decided. If you still need help with pricing, positioning, or which audience to target, step back to AI Home first and return here when you are ready to execute.
-              </p>
-            </div>
-          </div>
+	              </p>
+	            </div>
+	          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            {pendingDeployment && (
+              <div className="mb-8 rounded-[24px] border border-amber-200 bg-amber-50 p-5 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-700 dark:text-amber-300">
+                      Pending Deployment
+                    </p>
+                    <h2 className="mt-2 text-xl font-bold">
+                      {pendingDeployment.eventName} is still building
+                    </h2>
+                    <p className="mt-2 text-sm leading-7 text-amber-800 dark:text-amber-200">
+                      {pendingDeployment.completedTierCount} of {pendingDeployment.expectedTierCount} tiers are on chain.
+                      {pendingDeployment.failedTierIndex !== null
+                        ? ` Tier ${pendingDeployment.failedTierIndex + 1} failed last time.`
+                        : " Resume to submit the remaining tiers and finalize the event."}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={handleResumeDeployment}
+                      disabled={deploying}
+                      className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:cursor-wait disabled:opacity-70"
+                    >
+                      <span className="material-symbols-outlined text-base">play_arrow</span>
+                      Resume deployment
+                    </button>
+                    <button
+                      onClick={handleAbandonDeployment}
+                      disabled={deploying}
+                      className="inline-flex items-center gap-2 rounded-xl border border-amber-300 px-4 py-2.5 text-sm font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-wait disabled:opacity-70 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900/40"
+                    >
+                      <span className="material-symbols-outlined text-base">block</span>
+                      Abandon deployment
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+	          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
 
             {/* Sidebar */}
             <aside className="hidden lg:block space-y-1 sticky top-24 h-fit">
@@ -583,12 +885,14 @@ export default function CreateEventPage() {
                   </div>
                 )}
 
-                <button onClick={handleDeploy} disabled={deploying || !staked}
-                  className={`w-full py-5 text-xl font-black rounded-xl transition-all flex items-center justify-center gap-3 ${
-                    !staked  ? "bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
-                    : deploying ? "bg-[#5048e5]/70 text-white cursor-wait"
-                    :             "bg-[#5048e5] text-white hover:shadow-xl hover:shadow-[#5048e5]/20 hover:scale-[1.01]"
-                  }`}>
+	                <button
+                    onClick={pendingDeployment ? handleResumeDeployment : handleDeploy}
+                    disabled={deploying || (!staked && !pendingDeployment)}
+	                  className={`w-full py-5 text-xl font-black rounded-xl transition-all flex items-center justify-center gap-3 ${
+	                    (!staked && !pendingDeployment)  ? "bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
+	                    : deploying ? "bg-[#5048e5]/70 text-white cursor-wait"
+	                    :             "bg-[#5048e5] text-white hover:shadow-xl hover:shadow-[#5048e5]/20 hover:scale-[1.01]"
+	                  }`}>
                   {deploying ? (
                     <>
                       <svg className="animate-spin w-6 h-6" fill="none" viewBox="0 0 24 24">
@@ -597,13 +901,17 @@ export default function CreateEventPage() {
                       </svg>
                       Deploying to Solana...
                     </>
-                  ) : (
-                    <>
-                      <span className="material-symbols-outlined">rocket_launch</span>
-                      {staked ? "Deploy Smart Contract & Create Event" : "Complete Staking to Deploy"}
-                    </>
-                  )}
-                </button>
+	                  ) : (
+	                    <>
+	                      <span className="material-symbols-outlined">rocket_launch</span>
+	                      {pendingDeployment
+                          ? "Resume Pending Deployment"
+                          : staked
+                            ? "Deploy Smart Contract & Create Event"
+                            : "Complete Staking to Deploy"}
+	                    </>
+	                  )}
+	                </button>
 
                 {!staked && (
                   <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">

@@ -60,6 +60,11 @@ interface RawAccountRecord {
   account: unknown;
 }
 
+interface DeploymentStateAccountData {
+  event: { toBase58(): string };
+  status?: Record<string, unknown>;
+}
+
 interface ServerEventRecord {
   id: string;
   name: string;
@@ -236,25 +241,48 @@ function getProgramAccounts(program: ReadonlyProgram) {
     ticketTierAccount: {
       all(filters?: Array<{ memcmp: { offset: number; bytes: string } }>): Promise<RawAccountRecord[]>;
     };
+    deploymentStateAccount: {
+      all(filters?: Array<{ memcmp: { offset: number; bytes: string } }>): Promise<RawAccountRecord[]>;
+    };
     escrowAccount: {
       fetch(publicKey: PublicKey): Promise<EscrowAccountData>;
     };
   };
 }
 
+function filterPublicVisibleEvents(
+  rawEvents: RawAccountRecord[],
+  rawDeploymentStates: RawAccountRecord[]
+) {
+  const deploymentStatusByEvent = new Map(
+    rawDeploymentStates.map((record) => {
+      const data = record.account as DeploymentStateAccountData;
+      return [data.event.toBase58(), getStatusKey(data.status)];
+    })
+  );
+
+  return rawEvents.filter((record) => {
+    const status = deploymentStatusByEvent.get(record.publicKey.toBase58());
+    return !status || status === "ready";
+  });
+}
+
 async function getEventCatalog(): Promise<ServerEventRecord[]> {
   const program = getReadonlyProgram();
   const accounts = getProgramAccounts(program);
-  const [rawEvents, rawTiers] = await Promise.all([
+  const [rawEvents, rawTiers, rawDeploymentStates] = await Promise.all([
     cachedFetch<RawAccountRecord[]>("assistant:eventAccount", () =>
       accounts.eventAccount.all()
     ),
     cachedFetch<RawAccountRecord[]>("assistant:ticketTierAccount", () =>
       accounts.ticketTierAccount.all()
     ),
+    cachedFetch<RawAccountRecord[]>("assistant:deploymentStateAccount", () =>
+      accounts.deploymentStateAccount.all()
+    ),
   ]);
 
-  return rawEvents
+  return filterPublicVisibleEvents(rawEvents, rawDeploymentStates)
     .map((event) => normalizeEventRecord(event, rawTiers))
     .sort((left, right) => left.startTime - right.startTime);
 }
@@ -522,16 +550,21 @@ async function userTicketSummaryTool(input: { walletPublicKey?: string | null })
     };
   }
 
-  const [rawEvents, rawTiers] = await Promise.all([
+  const [rawEvents, rawTiers, rawDeploymentStates] = await Promise.all([
     cachedFetch<RawAccountRecord[]>("assistant:eventAccount", () =>
       accounts.eventAccount.all()
     ),
     cachedFetch<RawAccountRecord[]>("assistant:ticketTierAccount", () =>
       accounts.ticketTierAccount.all()
     ),
+    cachedFetch<RawAccountRecord[]>("assistant:deploymentStateAccount", () =>
+      accounts.deploymentStateAccount.all()
+    ),
   ]);
 
-  const events = rawEvents.map((event) => normalizeEventRecord(event, rawTiers));
+  const events = filterPublicVisibleEvents(rawEvents, rawDeploymentStates).map((event) =>
+    normalizeEventRecord(event, rawTiers)
+  );
   const eventByPda = new Map(events.map((event) => [event.eventPDA, event]));
   const now = Math.floor(Date.now() / 1000);
 

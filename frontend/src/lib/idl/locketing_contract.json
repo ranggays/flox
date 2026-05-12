@@ -8,6 +8,61 @@
   },
   "instructions": [
     {
+      "name": "abandon_event_deployment",
+      "discriminator": [
+        108,
+        51,
+        69,
+        42,
+        30,
+        238,
+        122,
+        166
+      ],
+      "accounts": [
+        {
+          "name": "event_account"
+        },
+        {
+          "name": "deployment_state_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  112,
+                  108,
+                  111,
+                  121,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "event_account",
+            "deployment_state_account"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "add_ticket_tier",
       "discriminator": [
         234,
@@ -25,6 +80,33 @@
           "writable": true
         },
         {
+          "name": "deployment_state_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  112,
+                  108,
+                  111,
+                  121,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event_account"
+              }
+            ]
+          }
+        },
+        {
           "name": "tier_account",
           "writable": true
         },
@@ -33,7 +115,8 @@
           "writable": true,
           "signer": true,
           "relations": [
-            "event_account"
+            "event_account",
+            "deployment_state_account"
           ]
         },
         {
@@ -234,6 +317,33 @@
           }
         },
         {
+          "name": "deployment_state_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  112,
+                  108,
+                  111,
+                  121,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event_account"
+              }
+            ]
+          }
+        },
+        {
           "name": "escrow_account",
           "writable": true
         },
@@ -254,6 +364,10 @@
         {
           "name": "event_id",
           "type": "u64"
+        },
+        {
+          "name": "expected_tier_count",
+          "type": "u8"
         },
         {
           "name": "name",
@@ -300,6 +414,61 @@
           "type": "string"
         }
       ]
+    },
+    {
+      "name": "finalize_event_deployment",
+      "discriminator": [
+        117,
+        134,
+        50,
+        226,
+        4,
+        29,
+        133,
+        55
+      ],
+      "accounts": [
+        {
+          "name": "event_account"
+        },
+        {
+          "name": "deployment_state_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  112,
+                  108,
+                  111,
+                  121,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "event_account",
+            "deployment_state_account"
+          ]
+        }
+      ],
+      "args": []
     },
     {
       "name": "initialize_escrow",
@@ -517,6 +686,19 @@
   ],
   "accounts": [
     {
+      "name": "DeploymentStateAccount",
+      "discriminator": [
+        26,
+        79,
+        255,
+        172,
+        251,
+        41,
+        34,
+        19
+      ]
+    },
+    {
       "name": "EscrowAccount",
       "discriminator": [
         36,
@@ -622,6 +804,21 @@
       "code": 6007,
       "name": "EventNotCancelled",
       "msg": "Hanya bisa refund untuk event yang dibatalkan"
+    },
+    {
+      "code": 6008,
+      "name": "DeploymentNotBuilding",
+      "msg": "Deployment event ini tidak sedang dalam status building."
+    },
+    {
+      "code": 6009,
+      "name": "DeploymentNotReady",
+      "msg": "Deployment event ini belum siap dipublikasikan."
+    },
+    {
+      "code": 6010,
+      "name": "DeploymentTierOverflow",
+      "msg": "Jumlah tier yang dibuat melebihi target deployment."
     }
   ],
   "types": [
@@ -650,6 +847,59 @@
           },
           {
             "name": "Other"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeploymentStateAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "organizer",
+            "type": "pubkey"
+          },
+          {
+            "name": "expected_tier_count",
+            "type": "u8"
+          },
+          {
+            "name": "created_tier_count",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "DeploymentStatus"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeploymentStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Building"
+          },
+          {
+            "name": "Ready"
+          },
+          {
+            "name": "Abandoned"
           }
         ]
       }
