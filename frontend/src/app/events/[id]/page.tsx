@@ -49,6 +49,11 @@ interface RawProgramAccount<T> {
   account: T;
 }
 
+interface RawDeploymentStateAccountData {
+  event: AddressLike;
+  status?: EnumLike;
+}
+
 interface ReadonlyProgram {
   account: {
     eventAccount: {
@@ -56,6 +61,9 @@ interface ReadonlyProgram {
     };
     ticketTierAccount: {
       all(): Promise<Array<RawProgramAccount<RawTierAccountData>>>;
+    };
+    deploymentStateAccount: {
+      all(): Promise<Array<RawProgramAccount<RawDeploymentStateAccountData>>>;
     };
   };
 }
@@ -88,6 +96,17 @@ function toNumber(value: NumberLike): number {
 
 function toBase58(value: AddressLike): string {
   return value?.toBase58() ?? "";
+}
+
+function isPublicVisibleEvent(
+  eventPublicKey: string,
+  deploymentStates: Array<RawProgramAccount<RawDeploymentStateAccountData>>
+) {
+  const deployment = deploymentStates.find(
+    (state) => toBase58(state.account.event) === eventPublicKey
+  );
+  if (!deployment) return true;
+  return enumKey(deployment.account.status ?? {}) === "ready";
 }
 
 function formatDateRange(startTs: number, endTs: number): string {
@@ -166,17 +185,22 @@ function buildTicketTiers(
 async function loadEventDetail(id: string): Promise<EventDetail | null> {
   try {
     const program = getReadonlyProgram();
-    const [rawEvents, rawTiers] = await Promise.all([
+    const [rawEvents, rawTiers, rawDeploymentStates] = await Promise.all([
       cachedFetch<Array<RawProgramAccount<RawEventAccountData>>>("eventAccount", () =>
         program.account.eventAccount.all()
       ),
       cachedFetch<Array<RawProgramAccount<RawTierAccountData>>>("ticketTierAccount", () =>
         program.account.ticketTierAccount.all()
       ),
+      cachedFetch<Array<RawProgramAccount<RawDeploymentStateAccountData>>>(
+        "deploymentStateAccount",
+        () => program.account.deploymentStateAccount.all()
+      ),
     ]);
 
     const match = rawEvents.find((eventAccount) => eventAccount.account.eventId.toString() === id);
     if (!match) return null;
+    if (!isPublicVisibleEvent(match.publicKey.toBase58(), rawDeploymentStates)) return null;
 
     const data = match.account;
     const eventPda = match.publicKey.toBase58();
