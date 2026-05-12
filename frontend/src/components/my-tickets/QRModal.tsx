@@ -133,7 +133,7 @@ export default function QRModal({ ticket, onClose }: QRModalProps) {
           {/* Verified badge */}
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <span className="material-symbols-outlined text-[#5048e5] text-sm">verified</span>
-            Verified on-chain · Locketing V2 · Solana Devnet
+            Verified on-chain · Flox · Solana Devnet
           </div>
         </div>
       </div>

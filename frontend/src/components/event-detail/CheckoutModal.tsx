@@ -297,7 +297,7 @@ export default function CheckoutModal({ ticket, event, onClose }: CheckoutModalP
 
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-                    Secured by Locketing V2
+                    Secured by Flox
                   </p>
                   <div className="flex items-center gap-3 text-slate-300 dark:text-slate-600">
                     <span className="text-xs font-bold uppercase">Solana Devnet</span>
